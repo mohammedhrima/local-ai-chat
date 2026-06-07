@@ -1,0 +1,21 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: local-ai-chat-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  ollama:
+    image: ollama/ollama
+    container_name: local-ai-chat-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ${HOME}/.ollama:/root/.ollama
+
+volumes:
+  mongo_data:

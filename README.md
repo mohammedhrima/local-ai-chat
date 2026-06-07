@@ -1,396 +1,88 @@
-# DeepSeek Clone - AI Chat Application 🤖💬
+# Local AI Chat 🤖
 
-A full-stack AI-powered chat application that replicates the DeepSeek AI assistant experience. Chat with an intelligent AI, save your conversation history, and enjoy a sleek, modern interface.
+A private, self-hosted AI chat app. It talks to a **local LLM via Ollama** — no API keys, no third-party accounts, your data never leaves your machine. Chat instantly as a guest, or sign in to save your conversations.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-DeepSeek%20Clone-green)](https://deep-seek-clone-one.vercel.app/)
+Built with **Next.js 15 (App Router) · React 19 · TypeScript · Tailwind v4 · TanStack Query · MongoDB · Ollama**.
 
-## 🎯 What Does It Do?
+## Features
 
-DeepSeek Clone is an AI chat application where you can:
+- **Local & private** — responses come from your own Ollama model; chats and accounts live in your own MongoDB.
+- **Guest mode** — start chatting with no account. Guest conversations are kept in memory and cleared on refresh.
+- **Saved history** — sign in (custom email/password JWT auth) to persist chats; rename and delete them.
+- **Streaming replies** — token-by-token responses.
+- **Markdown + code** — formatted answers with syntax-highlighted code blocks and copy buttons.
 
-- **Chat with AI**: Have natural conversations with an advanced AI assistant powered by DeepSeek
-- **Ask Questions**: Get answers on any topic - coding, general knowledge, problem-solving, creative writing, and more
-- **Save Conversations**: All your chat history is automatically saved and synced to the cloud
-- **Access Anywhere**: Your conversations are available across all your devices
-- **Secure Authentication**: Sign in securely with email, Google, or other providers
-- **Real-Time Responses**: Get instant AI responses with streaming text
-- **Multiple Conversations**: Create and manage multiple chat threads
-- **Clean Interface**: Enjoy a modern, distraction-free chat experience
+## Tech stack
 
-## 👤 Who Is It For?
+| | |
+|---|---|
+| **Frontend** | Next.js 15 · React 19 · TypeScript · Tailwind CSS v4 · TanStack Query · react-hook-form + zod · lucide-react |
+| **Backend** | Next.js route handlers · MongoDB (Mongoose) · custom JWT auth (`jose` + `bcryptjs`, httpOnly cookie) |
+| **AI** | Ollama (local), streamed via the chat API |
+| **Infra** | Docker Compose (MongoDB + Ollama) |
 
-- Developers seeking coding assistance and debugging help
-- Students needing homework help or explanations
-- Writers looking for creative inspiration
-- Professionals needing quick research and information
-- Anyone curious about AI and conversational interfaces
-- Developers learning to build AI-powered applications
+## Prerequisites
 
-## 🚀 How to Use
+- [Node.js](https://nodejs.org) 18+
+- [Docker](https://www.docker.com/) (runs MongoDB + Ollama)
 
-### For Users
+## Getting started
 
-1. **Visit the Live Demo**: [https://deep-seek-clone-one.vercel.app/](https://deep-seek-clone-one.vercel.app/)
-
-2. **Sign In**:
-   - Click "Sign In" button
-   - Choose your preferred method (Email, Google, etc.)
-   - Complete authentication
-
-3. **Start Chatting**:
-   - Type your question or message in the input box
-   - Press Enter or click Send
-   - Watch as the AI responds in real-time
-
-4. **Manage Conversations**:
-   - Click "New Chat" to start a fresh conversation
-   - Access previous chats from the sidebar
-   - Delete conversations you no longer need
-
-5. **Tips for Best Results**:
-   - Be specific with your questions
-   - Provide context when needed
-   - Break complex questions into smaller parts
-   - Use follow-up questions to dive deeper
-
-### For Developers
-
-#### Prerequisites
-
-- **Node.js** v16 or higher
-- **npm** or **yarn** package manager
-- Accounts on:
-  - [Clerk](https://clerk.com/) - Authentication
-  - [MongoDB Atlas](https://cloud.mongodb.com/) - Database
-  - [OpenRouter](https://openrouter.ai/) - DeepSeek API access
-
-#### Installation
-
-1. **Clone the Repository**:
+### 1. Environment
 ```bash
-git clone https://github.com/your-username/deep-seek-clone.git
-cd deep-seek-clone
+cp .env.example .env
+```
+Then set a real `JWT_SECRET` (e.g. `openssl rand -hex 32`). Defaults:
+```
+MONGODB_URI=mongodb://localhost:27017/local-ai-chat
+JWT_SECRET=...
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=granite3.1-dense:8b
 ```
 
-2. **Install Dependencies**:
+### 2. Start MongoDB + Ollama
+```bash
+docker compose up -d
+```
+This runs MongoDB on `27017` and Ollama on `11434`. The Ollama container bind-mounts your host `~/.ollama`, so any model you've already pulled is reused.
+
+Pull a model if you don't have one (set the same name in `OLLAMA_MODEL`):
+```bash
+docker exec local-ai-chat-ollama ollama pull granite3.1-dense:8b
+```
+
+### 3. Run the app
 ```bash
 npm install
-# or
-yarn install
+npm run dev          # http://localhost:3000
 ```
 
-3. **Set Up Environment Variables**:
+## How it works
 
-Create a `.env.local` file in the root directory:
+- `app/api/auth/*` — signup / login / logout / me. Passwords hashed with bcrypt; a JWT is stored in an httpOnly cookie (`lib/auth.ts`).
+- `app/api/chat/ai` — streams the Ollama response (`lib/ollama.ts`). For signed-in users it persists the turn to the chat; for guests it streams without saving.
+- `app/api/chat/{get,create,rename,delete}` — chat CRUD, scoped to the current user.
+- `hooks/*` — all data access via TanStack Query (`useAuth`, `useChats`, `useSendMessage`); components stay thin.
+- `models/*` — Mongoose `User` and `Chat` schemas; `lib/db.ts` caches the connection.
 
-```env
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
-CLERK_SECRET_KEY=sk_test_xxxxx
-SIGNING_SECRET=whsec_xxxxx
+## Project structure
 
-# MongoDB Database
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/dbname
-
-# DeepSeek AI API
-DEEPSEEK_API_KEY=sk-xxxxx
+```
+app/            # routes + API (auth, chat) + landing (/) and chat (/chat)
+components/     # landing/* and chat/* UI
+hooks/          # TanStack Query data hooks
+lib/            # db, auth (jwt/bcrypt), ollama, api fetch wrapper
+models/         # Mongoose User + Chat
+context/        # chat UI state (selected chat + guest messages)
+providers/      # React Query provider
+docker-compose.yml   # MongoDB + Ollama
 ```
 
-#### Getting API Keys
-
-**Clerk (Authentication):**
-1. Go to [Clerk Dashboard](https://dashboard.clerk.com/)
-2. Create a new application
-3. Copy `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from API Keys
-4. Copy `CLERK_SECRET_KEY` from API Keys
-5. For `SIGNING_SECRET`:
-   - Navigate to Webhooks
-   - Add endpoint: `https://your-domain.com/api/webhooks/clerk`
-   - Copy the signing secret
-
-**MongoDB Atlas (Database):**
-1. Go to [MongoDB Atlas](https://cloud.mongodb.com/)
-2. Create a free cluster
-3. Click "Connect" → "Connect your application"
-4. Copy the connection string
-5. Replace `<password>` with your database password
-
-**OpenRouter (AI API):**
-1. Go to [OpenRouter](https://openrouter.ai/)
-2. Sign up and navigate to API Keys
-3. Create a new API key
-4. Copy the key (starts with `sk-`)
-
-#### Run the Application
+## Scripts
 
 ```bash
-# Development mode
-npm run dev
-# or
-yarn dev
-
-# Open http://localhost:3000
+npm run dev        # dev server (Turbopack)
+npm run build      # production build
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
 ```
-
-#### Build for Production
-
-```bash
-# Build
-npm run build
-
-# Start production server
-npm start
-```
-
-## ✨ Key Features
-
-### AI-Powered Conversations
-- Natural language understanding
-- Context-aware responses
-- Multi-turn conversations
-- Streaming responses for real-time feel
-
-### User Authentication
-- Secure sign-in with Clerk
-- Multiple authentication methods (Email, Google, GitHub)
-- Session management
-- Protected routes
-
-### Conversation Management
-- Create unlimited chat threads
-- Automatic conversation saving
-- Search through chat history
-- Delete unwanted conversations
-- Conversation timestamps
-
-### Modern UI/UX
-- Clean, minimalist design
-- Responsive layout (mobile, tablet, desktop)
-- Dark mode support
-- Smooth animations and transitions
-- Loading states and error handling
-
-### Data Persistence
-- All conversations saved to MongoDB
-- User-specific data isolation
-- Fast retrieval and search
-- Reliable cloud storage
-
-## 🛠️ Technical Stack
-
-- **[Next.js](https://nextjs.org/)** - React framework with App Router and API routes
-- **[React](https://react.dev/)** - UI library
-- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
-- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[Clerk](https://clerk.com/)** - Authentication and user management
-- **[MongoDB](https://www.mongodb.com/)** - NoSQL database for conversation storage
-- **[OpenRouter](https://openrouter.ai/)** - AI API gateway for DeepSeek
-- **[Vercel](https://vercel.com/)** - Hosting and deployment
-
-## 📁 Project Structure
-
-```
-deep-seek-clone/
-├── app/
-│   ├── api/
-│   │   ├── chat/           # Chat API endpoint
-│   │   ├── conversations/  # Conversation CRUD
-│   │   └── webhooks/       # Clerk webhooks
-│   ├── chat/               # Chat page
-│   ├── sign-in/            # Sign in page
-│   ├── sign-up/            # Sign up page
-│   └── layout.tsx          # Root layout
-├── components/
-│   ├── ChatInterface.tsx   # Main chat UI
-│   ├── MessageList.tsx     # Message display
-│   ├── ChatInput.tsx       # Message input
-│   ├── Sidebar.tsx         # Conversation sidebar
-│   └── ...                 # Other components
-├── lib/
-│   ├── mongodb.ts          # Database connection
-│   ├── openrouter.ts       # AI API client
-│   └── utils.ts            # Utility functions
-├── models/
-│   ├── Conversation.ts     # Conversation schema
-│   └── Message.ts          # Message schema
-└── public/                 # Static assets
-```
-
-## 🔧 Configuration
-
-### Clerk Authentication Setup
-
-1. **Configure Allowed Redirect URLs**:
-   - Development: `http://localhost:3000`
-   - Production: `https://your-domain.com`
-
-2. **Set Up Webhooks** (for user sync):
-   - Endpoint: `/api/webhooks/clerk`
-   - Events: `user.created`, `user.updated`, `user.deleted`
-
-### MongoDB Setup
-
-1. **Create Database**: `deepseek_clone`
-2. **Collections**:
-   - `users` - User profiles
-   - `conversations` - Chat threads
-   - `messages` - Individual messages
-
-### Environment-Specific Settings
-
-**Development:**
-```env
-NODE_ENV=development
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-**Production:**
-```env
-NODE_ENV=production
-NEXT_PUBLIC_APP_URL=https://your-domain.com
-```
-
-## 📊 Data Models
-
-### Conversation Schema
-```typescript
-{
-  _id: ObjectId,
-  userId: string,
-  title: string,
-  createdAt: Date,
-  updatedAt: Date,
-  messages: Message[]
-}
-```
-
-### Message Schema
-```typescript
-{
-  _id: ObjectId,
-  conversationId: ObjectId,
-  role: 'user' | 'assistant',
-  content: string,
-  timestamp: Date
-}
-```
-
-## 🚀 Deployment
-
-### Deploy to Vercel (Recommended)
-
-1. **Push to GitHub**:
-```bash
-git add .
-git commit -m "Initial commit"
-git push origin main
-```
-
-2. **Import to Vercel**:
-   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
-   - Click "New Project"
-   - Import your GitHub repository
-   - Add environment variables
-   - Deploy
-
-3. **Update Clerk URLs**:
-   - Add Vercel URL to Clerk allowed redirects
-   - Update webhook endpoint to Vercel URL
-
-### Environment Variables on Vercel
-
-Add all variables from `.env.local` to Vercel:
-- Project Settings → Environment Variables
-- Add each variable individually
-- Redeploy after adding variables
-
-## 🧪 Testing
-
-### Test Locally
-
-```bash
-# Run development server
-npm run dev
-
-# Test authentication flow
-# Test chat functionality
-# Test conversation management
-```
-
-### Test API Endpoints
-
-```bash
-# Test chat endpoint
-curl -X POST http://localhost:3000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello, AI!"}'
-```
-
-## 🔐 Security Features
-
-- Secure authentication with Clerk
-- API route protection
-- User data isolation
-- Environment variable protection
-- HTTPS in production
-- CORS configuration
-- Rate limiting (recommended to add)
-
-## 📈 Future Enhancements
-
-- [ ] Voice input and output
-- [ ] Image generation capabilities
-- [ ] Code syntax highlighting
-- [ ] Export conversations (PDF, TXT)
-- [ ] Conversation sharing
-- [ ] Custom AI personalities
-- [ ] Multi-language support
-- [ ] Mobile app (React Native)
-- [ ] Conversation folders/tags
-- [ ] Advanced search and filters
-
-## 🎨 Customization
-
-### Change AI Model
-
-Edit `lib/openrouter.ts`:
-```typescript
-const model = "deepseek/deepseek-chat"; // Change to any OpenRouter model
-```
-
-### Customize Theme
-
-Edit `tailwind.config.js` for colors and styling.
-
-### Modify Chat Behavior
-
-Edit API route in `app/api/chat/route.ts` to adjust:
-- Temperature (creativity)
-- Max tokens (response length)
-- System prompts (AI personality)
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-- Report bugs
-- Suggest features
-- Submit pull requests
-- Improve documentation
-
-## 📄 License
-
-This project is open source and available under the MIT License.
-
-## 🙏 Acknowledgments
-
-- DeepSeek AI for the powerful language model
-- Clerk for seamless authentication
-- Vercel for excellent hosting
-- MongoDB for reliable data storage
-
-## 📞 Support
-
-For issues or questions:
-- Open an issue on GitHub
-- Check existing issues for solutions
-- Review documentation links above
